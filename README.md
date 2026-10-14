@@ -107,3 +107,68 @@ src/
 
 - **Impresión de tickets**: aún no implementada (el botón Imprimir muestra "Módulo en construcción").
 - **Sincronización con servidor**: las tablas ya tienen la marca `pending_sync`, pero todavía no existe el backend.
+
+## Generar APK de Android
+
+### Opción 1: compilación local
+
+Requiere Android Studio (SDK de Android) y JDK 17.
+
+```bash
+npm install
+npx expo prebuild --platform android   # genera/actualiza la carpeta android/
+cd android
+./gradlew assembleRelease
+```
+
+El APK queda en:
+
+```
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+Para instalarlo directamente en un dispositivo conectado por USB:
+
+```bash
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+```
+
+O compilar e instalar en un solo paso:
+
+```bash
+npx expo run:android --variant release
+```
+
+> Por defecto el APK de release se firma con la clave de depuración. Sirve para instalarlo directamente en los dispositivos del restaurante, pero no para publicarlo en Google Play. Para Play Store hay que configurar una clave de firma propia.
+
+### Opción 2: EAS Build (compilación en la nube de Expo)
+
+Requiere una cuenta gratuita en [expo.dev](https://expo.dev).
+
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure
+```
+
+En el `eas.json` generado, agregar un perfil que produzca APK en lugar de AAB:
+
+```json
+{
+  "build": {
+    "apk": {
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}
+```
+
+Y compilar:
+
+```bash
+eas build --platform android --profile apk
+```
+
+Al terminar, EAS muestra un enlace (y un código QR) para descargar el APK.
