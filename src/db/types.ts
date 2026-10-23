@@ -37,6 +37,18 @@ export interface Parametro {
   pending_sync: number;
 }
 
+export type ColumnasTicket = 32 | 48;
+
+export interface ImpresoraBluetooth {
+  direccion: string;
+  nombre: string;
+}
+
+export interface ConfiguracionImpresora extends ImpresoraBluetooth {
+  columnas: ColumnasTicket;
+  encabezado: string;
+}
+
 export interface Pedido {
   id: number;
   mesa_nombre: string;

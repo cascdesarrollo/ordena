@@ -1,5 +1,5 @@
 import { executeSql, nowIso } from './connection';
-import { formasPagoSeed, parametrosSeed, schemaStatements } from './schema';
+import { formasPagoSeed, parametroImpresoraSeed, parametrosSeed, schemaStatements } from './schema';
 import { migrateSpecialPassword } from '../services/passwordService';
 
 export const initDatabase = async () => {
@@ -98,6 +98,22 @@ export const initDatabase = async () => {
       );
     }
   }
+
+  const now = nowIso();
+  await executeSql(
+    `INSERT INTO parametros (codigo, descripcion, tipo, valor, created_at, updated_at, pending_sync)
+     SELECT ?, ?, ?, ?, ?, ?, 1
+     WHERE NOT EXISTS (SELECT 1 FROM parametros WHERE codigo = ?);`,
+    [
+      parametroImpresoraSeed.codigo,
+      parametroImpresoraSeed.descripcion,
+      parametroImpresoraSeed.tipo,
+      parametroImpresoraSeed.valor,
+      now,
+      now,
+      parametroImpresoraSeed.codigo,
+    ]
+  );
 
   const formasPagoCount = await executeSql('SELECT COUNT(*) as count FROM formas_pago');
   if ((formasPagoCount.rows.item(0)?.count ?? 0) === 0) {

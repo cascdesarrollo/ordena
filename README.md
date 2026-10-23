@@ -14,6 +14,7 @@ Funciona **100 % local**: no requiere servidor ni conexión a internet. Todos lo
 - Operaciones sensibles protegidas con una clave especial (anular, reactivar).
 - Reporte de pedidos por rango de fechas y estado.
 - Exportación de la base de datos para respaldo.
+- Impresión de tickets por Bluetooth clásico ESC/POS en Android, con formatos de 32 y 48 columnas.
 
 ## Módulos
 
@@ -49,6 +50,47 @@ Configuración de formas de pago (efectivo, pago móvil, transferencia, etc.) co
 | `BS_USD` | Tasa de cambio bolívares por dólar |
 | `TIP_SUGERIDO` | Porcentaje de propina sugerida |
 | `SPECIAL_PASSWORD` | Clave para operaciones especiales (se guarda como hash) |
+| `IMPRESORA_CONFIG` | Impresora, columnas y encabezado; se edita desde **Impresora y ticket**, no como texto libre |
+
+### Impresión Bluetooth (Android)
+
+1. Instalar un build actualizado con el módulo nativo: `npm install` y `npm run android`.
+   Recargar JavaScript en un build anterior no agrega Bluetooth.
+2. Encender la impresora y vincularla desde los ajustes Bluetooth de Android.
+3. Abrir **Parámetros → Impresora y ticket → Actualizar lista** y conceder el permiso
+   de dispositivos cercanos (Android 12 o superior). No se solicita ubicación ni se
+   descubren dispositivos desde la app: se listan los ya vinculados.
+4. Seleccionar la impresora. La lista también puede incluir otros dispositivos
+   Bluetooth clásico: elegir únicamente una impresora compatible con ESC/POS/SPP.
+5. Elegir **32 columnas** para la Digital POS DIG-P501A (48 mm de ancho imprimible,
+   aproximadamente 384 puntos y fuente A de 12 puntos). El perfil de **48 columnas**
+   es para impresoras con ese ancho disponible, habitualmente de 80 mm; no amplía
+   el ancho físico de una impresora pequeña.
+6. Escribir el encabezado (hasta 240 caracteres, admite varias líneas), comprobar
+   la conexión, imprimir una prueba y pulsar **Guardar configuración**. La prueba
+   usa los valores del formulario aunque todavía no se hayan guardado.
+7. Usar **Imprimir** en la pestaña General del pedido o en el detalle del Reporte.
+   La conexión se reutiliza mientras esté disponible; si se perdió, se intenta
+   conectar de nuevo al imprimir.
+
+El ticket incluye encabezado, número de orden, mesa, estado, fecha/hora local de
+creación, productos activos, cantidades, precios e importes en USD, totales en
+USD/COP/Bs y tasas usadas. Los nombres largos pasan a varias líneas sin recortarse.
+Los pedidos con snapshot conservan sus tasas y totales históricos; los demás usan
+los parámetros actuales. La propina sugerida se muestra aparte y **no se suma al total**.
+Las órdenes anuladas se identifican como tales.
+
+Se utiliza fuente A normal y página de caracteres **PC850 (ESC t 2)** para español.
+El ticket de prueba permite validar acentos y alineación con el firmware real.
+Caracteres no representables en CP850, como emojis, producen un aviso en lugar de
+enviar texto corrupto. No se envía corte automático, ya que la impresora portátil
+puede no disponer de cortador.
+
+No se reintenta automáticamente una escritura fallida para evitar duplicar tickets.
+Si hay un error después de comenzar, revisar el papel antes de volver a imprimir.
+Enviar los datos por Bluetooth **no confirma** que haya papel ni que la impresión
+física haya terminado. La conexión SPP y el resultado en la DIG-P501A deben probarse
+con la impresora real. La impresión no está habilitada para iOS ni web.
 
 ### Reporte
 - Filtro por rango de fechas y estado del pedido.
@@ -66,6 +108,7 @@ Acción del menú lateral que comparte una copia de la base de datos `ordena.db`
 - expo-sqlite (base de datos local)
 - expo-file-system + expo-sharing (exportación de la BD)
 - expo-crypto (hash de la clave especial)
+- react-native-bluetooth-classic (Bluetooth SPP, enlazado solo en Android)
 
 ## Requisitos
 
@@ -88,6 +131,13 @@ Verificación de tipos:
 npx tsc --noEmit
 ```
 
+Pruebas de impresión (Node.js, sin impresora ni módulos nativos; usan TypeScript
+ya instalado y el runner integrado de Node):
+
+```bash
+npm run test:impresion
+```
+
 ## Estructura del proyecto
 
 ```
@@ -95,7 +145,7 @@ App.tsx                 # Entrada: inicializa la BD y monta la navegación
 src/
   db/                   # Conexión, esquema, migraciones y tipos
   repositories/         # Acceso a datos (todo el SQL)
-  services/             # Lógica de negocio: totales, pagos, mover productos, exportar, clave
+  services/             # Totales, pagos, mover productos, exportar, clave e impresión Bluetooth
   navigation/           # Stack y menú lateral
   screens/              # Pantallas de la app
   components/           # Componentes reutilizables (modales, selectores, resúmenes)
@@ -105,7 +155,7 @@ src/
 
 ## Pendientes
 
-- **Impresión de tickets**: aún no implementada (el botón Imprimir muestra "Módulo en construcción").
+- **Impresión de tickets**: pendiente la validación física de conexión, acentos y ancho con la DIG-P501A.
 - **Sincronización con servidor**: las tablas ya tienen la marca `pending_sync`, pero todavía no existe el backend.
 
 ## Generar APK de Android

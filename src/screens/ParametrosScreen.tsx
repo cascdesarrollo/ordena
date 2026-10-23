@@ -2,10 +2,12 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ModalContainer } from '../components/ModalContainer';
+import { ImpresoraConfig } from '../components/ImpresoraConfig';
 import { commonStyles } from '../styles/common';
 import { colors, spacing } from '../styles/theme';
 import type { Parametro } from '../db/types';
 import { listParametros, updateParametroValor } from '../repositories/parametrosRepository';
+import { IMPRESORA_CONFIG_CODE } from '../repositories/impresoraRepository';
 import {
   SPECIAL_PASSWORD_CODE,
   setSpecialPassword,
@@ -27,7 +29,7 @@ export const ParametrosScreen = () => {
 
   const loadData = useCallback(async () => {
     const data = await listParametros();
-    setParametros(data);
+    setParametros(data.filter((parametro) => parametro.codigo !== IMPRESORA_CONFIG_CODE));
   }, []);
 
   useFocusEffect(
@@ -73,9 +75,10 @@ export const ParametrosScreen = () => {
 
   return (
     <View style={commonStyles.screen}>
-      <View style={commonStyles.card}>
+      <View style={[commonStyles.card, styles.lista]}>
         <Text style={commonStyles.title}>Parámetros</Text>
         <FlatList
+          ListHeaderComponent={<ImpresoraConfig />}
           data={parametros}
           keyExtractor={(item) => item.codigo}
           renderItem={({ item }) => (
@@ -166,6 +169,9 @@ export const ParametrosScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  lista: {
+    flex: 1,
+  },
   row: {
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,

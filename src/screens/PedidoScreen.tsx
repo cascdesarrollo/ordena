@@ -85,6 +85,8 @@ export const PedidoScreen = () => {
   const [showPasswordPedido, setShowPasswordPedido] = useState(false);
 
   const [totales, setTotales] = useState<TotalesPedido | null>(null);
+  const [imprimiendo, setImprimiendo] = useState(false);
+  const impresionEnCurso = useRef(false);
 
   const [pagos, setPagos] = useState<PedidoPagoView[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
@@ -128,6 +130,24 @@ export const PedidoScreen = () => {
   const handleMesaNombreChange = async (value: string) => {
     if (!pedido) return;
     setPedido({ ...pedido, mesa_nombre: value });
+  };
+
+  const handleImprimir = async () => {
+    if (impresionEnCurso.current) return;
+    impresionEnCurso.current = true;
+    setImprimiendo(true);
+    try {
+      await printOrderTicket(pedidoId);
+    } catch (error) {
+      Alert.alert(
+        'No se pudo completar la impresión',
+        `${error instanceof Error ? error.message : String(error)}\n\n` +
+        'Si comenzó a imprimir, revise el papel antes de reintentar.'
+      );
+    } finally {
+      impresionEnCurso.current = false;
+      setImprimiendo(false);
+    }
   };
 
   const handleMesaNombreBlur = async () => {
@@ -556,8 +576,12 @@ export const PedidoScreen = () => {
           ))}
 
           <View style={styles.actions}>
-            <TouchableOpacity style={[styles.actionButton, styles.primary]} onPress={() => printOrderTicket(pedidoId)}>
-              <Text style={styles.actionText}>Imprimir</Text>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.primary]}
+              onPress={handleImprimir}
+              disabled={imprimiendo}
+            >
+              <Text style={styles.actionText}>{imprimiendo ? 'Imprimiendo…' : 'Imprimir'}</Text>
             </TouchableOpacity>
             {editable ? (
               <>

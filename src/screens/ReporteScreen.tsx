@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
@@ -42,6 +42,8 @@ export const ReporteScreen = () => {
   const [totales, setTotales] = useState<TotalesPedido | null>(null);
   const [pagosPedido, setPagosPedido] = useState<PedidoPagoView[]>([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [imprimiendo, setImprimiendo] = useState(false);
+  const impresionEnCurso = useRef(false);
 
   const loadData = useCallback(async () => {
     const data = await listPedidosByFechaStatus(
@@ -82,6 +84,24 @@ export const ReporteScreen = () => {
     if (!selectedPedido) return;
     setShowDetalle(false);
     stackNavigation.navigate('Pedido', { pedidoId: selectedPedido.id, tab: 'Pagos' });
+  };
+
+  const handleImprimir = async () => {
+    if (!selectedPedido || impresionEnCurso.current) return;
+    impresionEnCurso.current = true;
+    setImprimiendo(true);
+    try {
+      await printOrderTicket(selectedPedido.id);
+    } catch (error) {
+      Alert.alert(
+        'No se pudo completar la impresión',
+        `${error instanceof Error ? error.message : String(error)}\n\n` +
+        'Si comenzó a imprimir, revise el papel antes de reintentar.'
+      );
+    } finally {
+      impresionEnCurso.current = false;
+      setImprimiendo(false);
+    }
   };
 
   const handleReactivar = async (password: string) => {
@@ -141,9 +161,10 @@ export const ReporteScreen = () => {
           <View style={styles.footerActions}>
             <TouchableOpacity
               style={[styles.footerButton, styles.primary]}
-              onPress={() => selectedPedido && printOrderTicket(selectedPedido.id)}
+              onPress={handleImprimir}
+              disabled={imprimiendo}
             >
-              <Text style={styles.footerButtonText}>Imprimir</Text>
+              <Text style={styles.footerButtonText}>{imprimiendo ? 'Imprimiendo…' : 'Imprimir'}</Text>
             </TouchableOpacity>
             {selectedPedido && selectedPedido.status !== 'Anulado' ? (
               <TouchableOpacity style={[styles.footerButton, styles.pagos]} onPress={handleOpenPagos}>

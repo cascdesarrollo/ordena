@@ -1,4 +1,4 @@
-import type { Divisa } from './types';
+import type { ConfiguracionImpresora, Divisa } from './types';
 
 export const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS mesas (
@@ -97,7 +97,20 @@ export const formasPagoSeed: { nombre: string; divisa: Divisa }[] = [
   { nombre: 'Binance', divisa: 'USD' },
 ];
 
+export const parametroImpresoraSeed = {
+  codigo: 'IMPRESORA_CONFIG',
+  descripcion: 'Configuración de impresora y ticket',
+  tipo: 'Texto',
+  valor: JSON.stringify({
+    direccion: '',
+    nombre: '',
+    columnas: 32,
+    encabezado: 'ORDENA',
+  } satisfies ConfiguracionImpresora),
+};
+
 export const parametrosSeed = [
+  parametroImpresoraSeed,
   {
     codigo: 'COP_USD',
     descripcion: 'Tasa de cambio de pesos a dolares',

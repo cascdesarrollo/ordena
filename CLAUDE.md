@@ -9,9 +9,10 @@ App móvil para llevar comandas (pedidos) y ventas de un restaurante. **Todo es 
 - **Navegación**: `@react-navigation` v7 — native-stack + drawer
 - **Persistencia**: `expo-sqlite` (API síncrona `openDatabaseSync`, BD `ordena.db`)
 - **Otros**: `@react-native-picker/picker`, `expo-file-system` (API nueva `File`/`Paths`; la API legacy como `copyAsync` lanza error en SDK 54) + `expo-sharing` (exportar BD), `expo-crypto` (hash de la clave especial), `react-native-reanimated` 4 + `react-native-worklets` (requeridos por el drawer)
+- **Impresión Android**: `react-native-bluetooth-classic` (SPP/RFCOMM + ESC/POS), excluido del autolinking iOS en `react-native.config.js`. Permisos declarados en `app.json`; Android 12+ pide dispositivos cercanos (CONNECT/SCAN). Solo se listan dispositivos ya vinculados, sin descubrimiento ni permisos de ubicación.
 - `babel.config.js` solo usa `babel-preset-expo`, que ya agrega el plugin de worklets; no añadir `react-native-reanimated/plugin` a mano.
 - Dependencias nativas nuevas → instalar con `npx expo install` y recompilar el dev build.
-- Sin librería de estado global (solo `useState` por pantalla), sin UI kit, sin tests, sin linter.
+- Sin librería de estado global (solo `useState` por pantalla), sin UI kit ni linter. Pruebas de impresión con el runner de Node y TypeScript ya instalado, sin módulos nativos.
 - `android/` e `ios/` son carpetas nativas **generadas** (prebuild) e ignoradas en git: no editarlas a mano, configurar vía `app.json`.
 
 ## Comandos
@@ -21,7 +22,8 @@ npm install
 npm run start          # expo start (dev client)
 npm run android        # expo run:android (compila nativo)
 npm run ios            # expo run:ios
-npx tsc --noEmit       # única verificación disponible; correrla tras cada cambio
+npx tsc --noEmit       # verificación de tipos; correrla tras cada cambio
+npm run test:impresion # formato, totales y Bluetooth simulado
 ```
 
 ## Estructura
@@ -38,15 +40,18 @@ src/
     mesasRepository.ts | productosRepository.ts | parametrosRepository.ts
     pedidosRepository.ts | pedidoDetalleRepository.ts
     formasPagoRepository.ts | pedidoPagosRepository.ts
+    impresoraRepository.ts # configuración tipada de impresora en parametros (JSON)
   services/
     exportService.ts       # checkpoint WAL + copia la BD a cache y la comparte
     passwordService.ts     # hash/verificación de SPECIAL_PASSWORD (usar siempre este servicio)
-    printService.ts        # STUB: muestra "Módulo en construcción"
+    printService.ts        # carga pedido/detalle, getTotalesPedido() y envía ticket ESC/POS
+    bluetoothPrinterService.ts # permisos, vinculados, conexión SPP, envíos exclusivos por bloques
     totalesService.ts      # totales USD/COP/BS + propina; snapshot al finalizar (finalizarPedidoConTotales)
     pagosService.ts        # divisas, tasaDivisa(), resumirPagos() (pagado vs total, tolerancia 0.01 USD)
     moverService.ts        # moverProductos(): separar cuentas / pasar líneas a otro pedido (en transacción)
   utils/
     format.ts              # localDateString() (YYYY-MM-DD local), parseDecimal() (acepta coma)
+    ticket.ts              # ticket 32/48 columnas, ajuste de líneas y codificación CP850
   navigation/
     RootNavigator.tsx      # Stack: Drawer | Pedido {pedidoId, tab?}
     DrawerNavigator.tsx    # Home | Mesas | Productos | Parametros | Reporte | FormasPago + acción "Exportar DB"
@@ -69,7 +74,7 @@ Todas las tablas tienen `created_at`, `updated_at` (ISO string UTC vía `nowIso(
 | `formas_pago` | id, nombre, divisa `USD/COP/BS`, status `Activo/Inactivo` | Configurables (menú Formas de pago). Seed con formas de Venezuela si la tabla está vacía (`formasPagoSeed`) |
 | `pedido_pagos` | id, pedido_id, forma_pago_id, divisa, monto, tasa, monto_usd, status `Activo/Anulado` | `monto` en la divisa de la forma de pago; `divisa`, `tasa` (unidades por USD) y `monto_usd = monto / tasa` se copian al registrar. La tasa es la del pedido (snapshot si está finalizado, si no la actual) |
 
-Parámetros sembrados: `COP_USD`, `BS_USD` (tasas de cambio), `TIP_SUGERIDO` (% de propina sugerida; se muestra en los totales y se congela en `propina_pct` al finalizar), `SPECIAL_PASSWORD` (clave para operaciones especiales; si está vacía, esas operaciones quedan bloqueadas).
+Parámetros sembrados: `COP_USD`, `BS_USD` (tasas de cambio), `TIP_SUGERIDO` (% de propina sugerida; se muestra en los totales y se congela en `propina_pct` al finalizar), `SPECIAL_PASSWORD` (clave para operaciones especiales; si está vacía, esas operaciones quedan bloqueadas), `IMPRESORA_CONFIG` (JSON tipado con `direccion`, `nombre`, `columnas` 32/48 y `encabezado`; se agrega también en BDs existentes con migración idempotente, sin sobrescribir ajustes). La configuración de impresora se edita solo con el formulario dedicado de Parámetros, no con el editor genérico.
 
 `SPECIAL_PASSWORD` se guarda como hash `sha256$<salt>$<hash>` (ver `passwordService.ts`). `initDatabase` convierte a hash una clave antigua en texto plano. Nunca leer/comparar `valor` directamente: usar `verifySpecialPassword()` y `setSpecialPassword()`. Los parámetros numéricos se guardan normalizados con punto decimal y ≥ 0.
 
@@ -81,9 +86,10 @@ No hay borrados físicos: se "elimina" cambiando `status` (Inactivo / Anulado / 
 - **Pedido** (stack con header propio "Pedido #id" y flecha de volver, recibe `pedidoId` y `tab` opcional) — Si el pedido no está `Activo`, la pantalla es de **solo lectura** (sin agregar/editar líneas, finalizar ni anular; solo Imprimir). Nombre de mesa editable (guarda en `onBlur`, valida vacío y duplicado activo). Tabs:
   - *Productos*: líneas activas; FAB → agregar producto (filtro por tipo, orden Principal→Bebidas→Postres→Entrada, luego nombre). Tocar un producto lo agrega con cantidad 1 y cierra el modal (sin botón Aceptar); si ya hay una línea activa de ese producto le suma 1. Cada línea tiene botones − / + (de uno en uno, actualización optimista con `detalleRef`); bajar de 1 pide anular la línea. Tocar el centro de la línea abre el modal para editar la cantidad a mano (debe ser > 0). Anular línea requiere `SPECIAL_PASSWORD`. Botón **Separar / mover productos** (solo pedido activo): destino = pedido activo existente o "Nuevo pedido…" (valida nombre duplicado), cantidad a mover por línea con − / +; sin clave; avisa si el origen tiene pagos; al terminar ofrece ir al destino (`navigation.push`). Las líneas recibidas muestran "Movido de <mesa>".
   - *Pagos*: lista de pagos activos + total/pagado/pendiente o excedente (propina) en las 3 divisas. FAB → agregar pago (forma de pago + monto, prellenado con lo pendiente en esa divisa). Se permiten pagos mayores o menores al total, pero si el pagado resultante ≠ total se pide confirmación. Cada pago tiene botón Anular (confirmación + clave). Se pueden registrar pagos en pedidos `Activo` **y `Finalizado`** (no en `Anulado`).
-  - *General*: tabla `TotalesResumen` (total y propina sugerida por divisa USD/COP/BS; valores guardados si el pedido está finalizado, si no con tasas actuales), cantidades por tipo, botones Imprimir (stub), Finalizar (confirmación; si los pagos no cuadran con el total lo indica y ofrece "Agregar pago") y Anular pedido (requiere clave).
+  - *General*: tabla `TotalesResumen` (total y propina sugerida por divisa USD/COP/BS; valores guardados si el pedido está finalizado, si no con tasas actuales), cantidades por tipo, botones Imprimir (Bluetooth Android), Finalizar (confirmación; si los pagos no cuadran con el total lo indica y ofrece "Agregar pago") y Anular pedido (requiere clave).
 - **Mesas** / **Productos** — CRUD simple con lista + FAB + modal (crear/editar, cambiar status). Precio de producto ≥ 0.
 - **Parámetros** — Lista y edición del `valor`; valida numérico ≥ 0 si `tipo = Numerico`. La clave especial se muestra como "Configurada/Sin configurar"; cambiarla pide la clave actual (si existe) y confirmación.
+  - **Impresora y ticket** (Android): modal `ImpresoraConfig` para elegir dispositivo vinculado, abrir ajustes Bluetooth, comprobar conexión, seleccionar 32/48 columnas, editar encabezado multilinea (1–240 caracteres), imprimir prueba y guardar. Predeterminado: 32 columnas, encabezado ORDENA, sin impresora. La prueba usa el formulario; Pedido/Reporte usan la configuración guardada.
 - **Reporte** — Filtro por rango de fechas locales (texto `YYYY-MM-DD`) y status. Acepta params opcionales `ReporteFiltro` (se aplican y luego se limpian con `replaceParams`). Al tocar un pedido abre su detalle (líneas activas `cantidad x precio`, monto y `TotalesResumen`) y sus pagos, con Imprimir, Pagos (abre `Pedido` en la pestaña Pagos; no para anulados) y, si no está activo, Reactivar (requiere clave y que no haya otro pedido activo con esa mesa).
 - **Formas de pago** — CRUD (nombre único case-insensitive, divisa, status). Solo las activas aparecen al agregar pagos.
 - **Menú lateral → Exportar DB** — Acción (no pantalla) que comparte una copia de `ordena.db`.
@@ -103,7 +109,7 @@ No hay borrados físicos: se "elimina" cambiando `status` (Inactivo / Anulado / 
 
 ## Pendientes conocidos
 
-- **Impresión de tickets**: no implementada (`printService` muestra "Módulo en construcción"). Se hará al final; requiere definir impresora (Bluetooth/red, ESC/POS). El ticket debería usar los totales de `getTotalesPedido()`.
+- **Impresión de tickets**: implementada para Android con ESC/POS/SPP; falta validación física con Digital POS DIG-P501A (32 columnas, 48 mm imprimibles, fuente A). Formato alternativo de 48 columnas para equipos compatibles. Ticket con líneas activas, precios del pedido, fecha/hora local de creación y totales de `getTotalesPedido()`; propina aparte. CP850 (`ESC t 2`) admite español, rechaza caracteres no representables y neutraliza controles en los textos. Envía por bloques con espera proporcional a las líneas, sin corte automático ni reintento de escrituras fallidas. Éxito de envío no confirma papel/impresión física. Sin soporte de impresión para iOS/web.
 - La clave especial está hasheada, pero la app es local y "Exportar DB" entrega la BD completa: es protección básica, no fuerte.
 - `expo`, `expo-dev-client` y `expo-file-system` tienen actualizaciones de parche pendientes (`npx expo install --check`).
 
