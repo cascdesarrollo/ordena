@@ -10,6 +10,7 @@ App móvil para llevar comandas (pedidos) y ventas de un restaurante. **Todo es 
 - **Persistencia**: `expo-sqlite` (API síncrona `openDatabaseSync`, BD `ordena.db`)
 - **Otros**: `@react-native-picker/picker`, `expo-file-system` (API nueva `File`/`Paths`; la API legacy como `copyAsync` lanza error en SDK 54) + `expo-sharing` (exportar BD), `expo-crypto` (hash de la clave especial), `react-native-reanimated` 4 + `react-native-worklets` (requeridos por el drawer)
 - **Impresión Android**: `react-native-bluetooth-classic` (SPP/RFCOMM + ESC/POS), excluido del autolinking iOS en `react-native.config.js`. Permisos declarados en `app.json`; Android 12+ pide dispositivos cercanos (CONNECT/SCAN). Solo se listan dispositivos ya vinculados, sin descubrimiento ni permisos de ubicación.
+- **Icono y splash**: `assets/icon.png` (1024, fondo blanco), `assets/adaptive-icon.png` (logo al ~62% por la zona segura de Android), `assets/splash-icon.png` vía plugin `expo-splash-screen` en `app.json` (`imageWidth: 140` para que el logo quepa en la máscara circular de Android 12+). Cambiarlos exige `npx expo prebuild --clean` + recompilar.
 - `babel.config.js` solo usa `babel-preset-expo`, que ya agrega el plugin de worklets; no añadir `react-native-reanimated/plugin` a mano.
 - Dependencias nativas nuevas → instalar con `npx expo install` y recompilar el dev build.
 - Sin librería de estado global (solo `useState` por pantalla), sin UI kit ni linter. Pruebas de impresión con el runner de Node y TypeScript ya instalado, sin módulos nativos.
@@ -29,7 +30,7 @@ npm run test:impresion # formato, totales y Bluetooth simulado
 ## Estructura
 
 ```
-index.ts / App.tsx         # entrada: initDatabase() → muestra spinner → RootNavigator
+index.ts / App.tsx         # entrada: initDatabase() → muestra spinner → RootNavigator dentro de SafeAreaView edges=['bottom'] (edge-to-edge: evita que la barra de navegación de Android tape FAB/listas)
 src/
   db/
     connection.ts          # getDb(), executeSql(sql, params), nowIso(), runInTransaction()
@@ -54,7 +55,7 @@ src/
     ticket.ts              # ticket 32/48 columnas, ajuste de líneas y codificación CP850
   navigation/
     RootNavigator.tsx      # Stack: Drawer | Pedido {pedidoId, tab?}
-    DrawerNavigator.tsx    # Home | Mesas | Productos | Parametros | Reporte | FormasPago + acción "Exportar DB"
+    DrawerNavigator.tsx    # Home | Mesas | Productos | Parametros | Reporte | FormasPago + acción "Exportar DB"; logo (`icon.png`) arriba del menú lateral; Home usa `assets/logo-horizontal.png` como título del header (solo ahí), las demás pantallas su título de texto
   screens/                 # una pantalla por archivo, lógica + UI juntas
   components/              # FloatingActionButton, ModalContainer, PasswordPrompt, SegmentedTabs, SelectPicker, TotalesResumen, PagosResumen
   styles/                  # theme.ts (colors, spacing, radius) y common.ts (commonStyles)

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { initDatabase } from './src/db/migrations';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -44,7 +45,11 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <RootNavigator />
+      <SafeAreaProvider>
+        <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
+          <RootNavigator />
+        </SafeAreaView>
+      </SafeAreaProvider>
       <StatusBar style="auto" />
     </GestureHandlerRootView>
   );

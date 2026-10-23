@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Image, StyleSheet, View } from 'react-native';
 import {
   createDrawerNavigator,
   DrawerContentComponentProps,
@@ -15,6 +15,7 @@ import { ReporteScreen } from '../screens/ReporteScreen';
 import { FormasPagoScreen } from '../screens/FormasPagoScreen';
 import { exportDatabase } from '../services/exportService';
 import type { ReporteFiltro } from '../db/types';
+import { colors, spacing } from '../styles/theme';
 
 export type DrawerParamList = {
   Home: undefined;
@@ -26,6 +27,12 @@ export type DrawerParamList = {
 };
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
+const logo = require('../../assets/icon.png');
+const logoHorizontal = require('../../assets/logo-horizontal.png');
+
+const HeaderLogo = () => (
+  <Image source={logoHorizontal} style={styles.headerLogo} resizeMode="contain" accessibilityLabel="ORDENA" />
+);
 
 const handleExport = () => {
   Alert.alert('Exportar DB', '¿Desea exportar la base de datos?', [
@@ -46,6 +53,9 @@ const handleExport = () => {
 
 const DrawerContent = (props: DrawerContentComponentProps) => (
   <DrawerContentScrollView {...props}>
+    <View style={styles.drawerBrand}>
+      <Image source={logo} style={styles.drawerLogo} resizeMode="contain" accessibilityLabel="ORDENA" />
+    </View>
     <DrawerItemList {...props} />
     <DrawerItem
       label="Exportar DB"
@@ -62,7 +72,7 @@ export const DrawerNavigator = () => (
     screenOptions={{ headerTitleAlign: 'center' }}
     drawerContent={(props) => <DrawerContent {...props} />}
   >
-    <Drawer.Screen name="Home" component={HomeScreen} options={{ title: 'ORDENA' }} />
+    <Drawer.Screen name="Home" component={HomeScreen} options={{ title: 'ORDENA', headerTitle: HeaderLogo }} />
     <Drawer.Screen name="Mesas" component={MesasScreen} />
     <Drawer.Screen name="Productos" component={ProductosScreen} />
     <Drawer.Screen name="Parametros" component={ParametrosScreen} />
@@ -70,3 +80,22 @@ export const DrawerNavigator = () => (
     <Drawer.Screen name="FormasPago" component={FormasPagoScreen} options={{ title: 'Formas de pago' }} />
   </Drawer.Navigator>
 );
+
+const styles = StyleSheet.create({
+  drawerBrand: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  drawerLogo: {
+    width: 152,
+    height: 152,
+  },
+  headerLogo: {
+    width: 120,
+    height: 32,
+  },
+});
