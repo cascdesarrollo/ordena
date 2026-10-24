@@ -7,6 +7,18 @@ export const commonStyles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.md,
   },
+  // Deja libre la zona del FloatingActionButton para que no tape el final de la lista.
+  screenWithFab: {
+    paddingBottom: 88,
+  },
+  // Contenido de un ScrollView de pantalla con FloatingActionButton.
+  scrollContentWithFab: {
+    paddingBottom: 88,
+  },
+  // Card con lista que se encoge y hace scroll si no cabe en la pantalla.
+  listCard: {
+    flexShrink: 1,
+  },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.md,

@@ -119,6 +119,7 @@ export const ImpresoraConfig = () => {
       <ModalContainer
         visible={visible}
         title="Impresora y ticket"
+        scroll={false}
         onClose={() => { if (!ocupado.current) setVisible(false); }}
         footer={
           <TouchableOpacity style={commonStyles.button} onPress={guardar} disabled={!!accion}>
@@ -127,7 +128,7 @@ export const ImpresoraConfig = () => {
         }
       >
         {configuracion ? (
-          <ScrollView style={{ maxHeight: height * 0.55 }} keyboardShouldPersistTaps="handled">
+          <ScrollView style={{ maxHeight: height * 0.55, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
             <Text style={commonStyles.mutedText}>
               Vincule primero la impresora desde Android. La lista muestra dispositivos
               Bluetooth clásico vinculados; seleccione únicamente su impresora ESC/POS.

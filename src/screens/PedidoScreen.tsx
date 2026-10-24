@@ -478,43 +478,44 @@ export const PedidoScreen = () => {
 
   return (
     <View style={commonStyles.screen}>
-      <View style={commonStyles.card}>
-        <Text style={commonStyles.label}>Mesa</Text>
-        <TextInput
-          style={commonStyles.input}
-          value={pedido?.mesa_nombre || ''}
-          onChangeText={handleMesaNombreChange}
-          onBlur={handleMesaNombreBlur}
-          editable={editable}
-        />
-        {pedido && !editable ? (
-          <Text style={styles.readOnlyText}>
-            Pedido {pedido.status}: solo lectura{pagosEditable ? ' (se pueden agregar pagos)' : ''}.
-          </Text>
-        ) : null}
-        <Text style={commonStyles.mutedText}>
-          Creado: {pedido ? new Date(pedido.created_at).toLocaleString() : '-'}
-        </Text>
-      </View>
-
-      <SegmentedTabs
-        tabs={['Productos', 'General', 'Pagos']}
-        active={tab}
-        onChange={(t) => setTab(t as PedidoTab)}
-      />
-
-      {tab === 'Productos' ? (
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={commonStyles.scrollContentWithFab}
+      >
         <View style={commonStyles.card}>
-          {editable && activos.length > 0 ? (
-            <TouchableOpacity style={styles.moverButton} onPress={openMover}>
-              <Text style={styles.moverButtonText}>Separar / mover productos</Text>
-            </TouchableOpacity>
+          <Text style={commonStyles.label}>Mesa</Text>
+          <TextInput
+            style={commonStyles.input}
+            value={pedido?.mesa_nombre || ''}
+            onChangeText={handleMesaNombreChange}
+            onBlur={handleMesaNombreBlur}
+            editable={editable}
+          />
+          {pedido && !editable ? (
+            <Text style={styles.readOnlyText}>
+              Pedido {pedido.status}: solo lectura{pagosEditable ? ' (se pueden agregar pagos)' : ''}.
+            </Text>
           ) : null}
-          <FlatList
-            data={activos}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.row}>
+          <Text style={commonStyles.mutedText}>
+            Creado: {pedido ? new Date(pedido.created_at).toLocaleString() : '-'}
+          </Text>
+        </View>
+
+        <SegmentedTabs
+          tabs={['Productos', 'General', 'Pagos']}
+          active={tab}
+          onChange={(t) => setTab(t as PedidoTab)}
+        />
+
+        {tab === 'Productos' ? (
+          <View style={commonStyles.card}>
+            {editable && activos.length > 0 ? (
+              <TouchableOpacity style={styles.moverButton} onPress={openMover}>
+                <Text style={styles.moverButtonText}>Separar / mover productos</Text>
+              </TouchableOpacity>
+            ) : null}
+            {activos.map((item) => (
+              <View key={item.id} style={styles.row}>
                 {editable ? (
                   <TouchableOpacity
                     style={styles.stepButton}
@@ -548,54 +549,56 @@ export const PedidoScreen = () => {
                   </TouchableOpacity>
                 ) : null}
               </View>
-            )}
-            ListEmptyComponent={<Text style={commonStyles.mutedText}>No hay productos en el pedido.</Text>}
-          />
-        </View>
-      ) : tab === 'Pagos' ? (
-        <View style={commonStyles.card}>
-          <Text style={commonStyles.title}>Pagos</Text>
-          {totales ? (
-            <PagosResumen
-              pagos={pagos}
-              totales={totales}
-              onAnularPago={pagosEditable ? handleAnularPagoPress : undefined}
-            />
-          ) : null}
-        </View>
-      ) : (
-        <View style={commonStyles.card}>
-          <Text style={commonStyles.title}>Resumen</Text>
-          {totales ? <TotalesResumen totales={totales} /> : null}
-
-          <Text style={commonStyles.title}>Cantidad por tipo</Text>
-          {tipoOrder.map((tipo) => (
-            <Text key={tipo} style={styles.resumeLine}>
-              {tipo}: {countByTipo[tipo] || 0}
-            </Text>
-          ))}
-
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.primary]}
-              onPress={handleImprimir}
-              disabled={imprimiendo}
-            >
-              <Text style={styles.actionText}>{imprimiendo ? 'Imprimiendo…' : 'Imprimir'}</Text>
-            </TouchableOpacity>
-            {editable ? (
-              <>
-                <TouchableOpacity style={[styles.actionButton, styles.success]} onPress={handleFinalizar}>
-                  <Text style={styles.actionText}>Finalizar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionButton, styles.danger]} onPress={() => setShowPasswordPedido(true)}>
-                  <Text style={styles.actionText}>Anular</Text>
-                </TouchableOpacity>
-              </>
+            ))}
+            {activos.length === 0 ? (
+              <Text style={commonStyles.mutedText}>No hay productos en el pedido.</Text>
             ) : null}
           </View>
-        </View>
-      )}
+        ) : tab === 'Pagos' ? (
+          <View style={commonStyles.card}>
+            <Text style={commonStyles.title}>Pagos</Text>
+            {totales ? (
+              <PagosResumen
+                pagos={pagos}
+                totales={totales}
+                onAnularPago={pagosEditable ? handleAnularPagoPress : undefined}
+              />
+            ) : null}
+          </View>
+        ) : (
+          <View style={commonStyles.card}>
+            <Text style={commonStyles.title}>Resumen</Text>
+            {totales ? <TotalesResumen totales={totales} /> : null}
+
+            <Text style={commonStyles.title}>Cantidad por tipo</Text>
+            {tipoOrder.map((tipo) => (
+              <Text key={tipo} style={styles.resumeLine}>
+                {tipo}: {countByTipo[tipo] || 0}
+              </Text>
+            ))}
+
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.primary]}
+                onPress={handleImprimir}
+                disabled={imprimiendo}
+              >
+                <Text style={styles.actionText}>{imprimiendo ? 'Imprimiendo…' : 'Imprimir'}</Text>
+              </TouchableOpacity>
+              {editable ? (
+                <>
+                  <TouchableOpacity style={[styles.actionButton, styles.success]} onPress={handleFinalizar}>
+                    <Text style={styles.actionText}>Finalizar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionButton, styles.danger]} onPress={() => setShowPasswordPedido(true)}>
+                    <Text style={styles.actionText}>Anular</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+            </View>
+          </View>
+        )}
+      </ScrollView>
 
       {tab === 'Productos' && editable ? (
         <FloatingActionButton onPress={() => setShowAddItem(true)} />
@@ -607,6 +610,7 @@ export const PedidoScreen = () => {
         visible={showMover}
         title="Separar / mover productos"
         onClose={() => setShowMover(false)}
+        scroll={false}
         footer={
           <TouchableOpacity style={commonStyles.button} onPress={handleMover}>
             <Text style={commonStyles.buttonText}>
@@ -711,6 +715,7 @@ export const PedidoScreen = () => {
         visible={showAddItem}
         title="Agregar producto"
         onClose={() => setShowAddItem(false)}
+        scroll={false}
       >
         <Text style={commonStyles.label}>Tipo</Text>
         <SelectPicker options={tipoFilterOptions} value={tipoFiltro} onChange={setTipoFiltro} />
@@ -841,6 +846,7 @@ const styles = StyleSheet.create({
   },
   moverList: {
     maxHeight: 360,
+    flexShrink: 1,
   },
   moverRow: {
     flexDirection: 'row',
@@ -859,6 +865,7 @@ const styles = StyleSheet.create({
   },
   productosList: {
     maxHeight: 420,
+    flexShrink: 1,
     marginTop: spacing.xs,
   },
   rowTitle: {

@@ -68,8 +68,8 @@ export const FormasPagoScreen = () => {
   };
 
   return (
-    <View style={commonStyles.screen}>
-      <View style={commonStyles.card}>
+    <View style={[commonStyles.screen, commonStyles.screenWithFab]}>
+      <View style={[commonStyles.card, commonStyles.listCard]}>
         <Text style={commonStyles.title}>Formas de pago</Text>
         <FlatList
           data={formas}

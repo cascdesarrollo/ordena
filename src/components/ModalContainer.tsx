@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { Modal, View, StyleSheet, TouchableOpacity, Text, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../styles/theme';
 
 interface Props {
@@ -8,36 +9,53 @@ interface Props {
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  // false si el contenido ya trae su propia lista con scroll (FlatList/ScrollView).
+  scroll?: boolean;
 }
 
-export const ModalContainer: React.FC<Props> = ({ visible, title, onClose, children, footer }) => (
-  <Modal visible={visible} transparent animationType="slide">
-    <View style={styles.overlay}>
-      <View style={styles.card}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{title}</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.close}>✕</Text>
-          </TouchableOpacity>
+export const ModalContainer: React.FC<Props> = ({ visible, title, onClose, children, footer, scroll = true }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View
+        style={[
+          styles.overlay,
+          { paddingTop: spacing.md + insets.top, paddingBottom: spacing.md + insets.bottom },
+        ]}
+      >
+        <View style={styles.card}>
+          <View style={styles.header}>
+            <Text style={styles.title}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={styles.close}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          {scroll ? (
+            <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+              {children}
+            </ScrollView>
+          ) : (
+            <View style={styles.body}>{children}</View>
+          )}
+          {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
-        <View style={styles.body}>{children}</View>
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
     padding: spacing.md,
+    maxHeight: '100%',
   },
   header: {
     flexDirection: 'row',
@@ -55,6 +73,8 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   body: {
+    flexGrow: 0,
+    flexShrink: 1,
     marginBottom: spacing.sm,
   },
   footer: {

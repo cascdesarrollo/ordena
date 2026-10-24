@@ -91,7 +91,7 @@ export const HomeScreen = () => {
   };
 
   return (
-    <View style={commonStyles.screen}>
+    <View style={[commonStyles.screen, commonStyles.screenWithFab]}>
       <View style={commonStyles.card}>
         <Text style={commonStyles.title}>Indicadores de Hoy</Text>
         <View style={styles.indicadoresGrid}>
@@ -110,7 +110,7 @@ export const HomeScreen = () => {
         </View>
       </View>
 
-      <View style={commonStyles.card}>
+      <View style={[commonStyles.card, commonStyles.listCard]}>
         <Text style={commonStyles.title}>Pedidos Activos</Text>
         <FlatList
           data={pedidosActivos}

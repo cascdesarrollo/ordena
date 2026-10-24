@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -122,41 +122,40 @@ export const ReporteScreen = () => {
 
   return (
     <View style={commonStyles.screen}>
-      <View style={commonStyles.card}>
-        <Text style={commonStyles.title}>Filtros</Text>
-        <Text style={commonStyles.label}>Fecha inicio (YYYY-MM-DD)</Text>
-        <TextInput style={commonStyles.input} value={fechaInicio} onChangeText={setFechaInicio} />
-        <Text style={commonStyles.label}>Fecha fin (YYYY-MM-DD)</Text>
-        <TextInput style={commonStyles.input} value={fechaFin} onChangeText={setFechaFin} />
-        <Text style={commonStyles.label}>Status</Text>
-        <SelectPicker options={statusFilterOptions} value={status} onChange={setStatus} />
-        <TouchableOpacity style={commonStyles.button} onPress={loadData}>
-          <Text style={commonStyles.buttonText}>Consultar</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView keyboardShouldPersistTaps="handled">
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.title}>Filtros</Text>
+          <Text style={commonStyles.label}>Fecha inicio (YYYY-MM-DD)</Text>
+          <TextInput style={commonStyles.input} value={fechaInicio} onChangeText={setFechaInicio} />
+          <Text style={commonStyles.label}>Fecha fin (YYYY-MM-DD)</Text>
+          <TextInput style={commonStyles.input} value={fechaFin} onChangeText={setFechaFin} />
+          <Text style={commonStyles.label}>Status</Text>
+          <SelectPicker options={statusFilterOptions} value={status} onChange={setStatus} />
+          <TouchableOpacity style={commonStyles.button} onPress={loadData}>
+            <Text style={commonStyles.buttonText}>Consultar</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={commonStyles.card}>
-        <Text style={commonStyles.title}>Pedidos</Text>
-        <FlatList
-          data={pedidos}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => handleOpenDetalle(item)}>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.title}>Pedidos</Text>
+          {pedidos.map((item) => (
+            <TouchableOpacity key={item.id} style={styles.row} onPress={() => handleOpenDetalle(item)}>
               <View>
                 <Text style={styles.rowTitle}>{item.mesa_nombre}</Text>
                 <Text style={commonStyles.mutedText}>{new Date(item.created_at).toLocaleString()}</Text>
               </View>
               <Text style={styles.status}>{item.status}</Text>
             </TouchableOpacity>
-          )}
-          ListEmptyComponent={<Text style={commonStyles.mutedText}>No hay pedidos.</Text>}
-        />
-      </View>
+          ))}
+          {pedidos.length === 0 ? <Text style={commonStyles.mutedText}>No hay pedidos.</Text> : null}
+        </View>
+      </ScrollView>
 
       <ModalContainer
         visible={showDetalle}
         title="Detalle de pedido"
         onClose={() => setShowDetalle(false)}
+        scroll={false}
         footer={
           <View style={styles.footerActions}>
             <TouchableOpacity
@@ -239,6 +238,7 @@ const styles = StyleSheet.create({
   },
   detalleScroll: {
     maxHeight: 460,
+    flexShrink: 1,
   },
   seccion: {
     marginTop: spacing.sm,
