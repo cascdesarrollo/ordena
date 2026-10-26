@@ -82,6 +82,27 @@ export interface PedidoDetalle {
   pending_sync: number;
 }
 
+export type StatusDescuento = 'Activo' | 'Anulado';
+
+export interface PedidoDescuento {
+  id: number;
+  pedido_id: number;
+  pedido_detalle_id: number | null;
+  descripcion: string;
+  monto_usd: number;
+  status: StatusDescuento;
+  created_at: string;
+  updated_at: string;
+  pending_sync: number;
+}
+
+export interface PedidoDescuentoView extends PedidoDescuento {
+  producto_nombre: string | null;
+  producto_linea?: number | null;
+  producto_cantidad?: number | null;
+  producto_precio?: number | null;
+}
+
 export interface TasasPedido {
   tasaCop: number;
   tasaBs: number;
@@ -89,6 +110,8 @@ export interface TasasPedido {
 }
 
 export interface TotalesPedido extends TasasPedido {
+  subtotalUsd: number;
+  descuentoUsd: number;
   totalUsd: number;
   totalCop: number;
   totalBs: number;
@@ -125,9 +148,42 @@ export interface PedidoPagoView extends PedidoPago {
   forma_pago_nombre: string;
 }
 
+export type PresentacionReportePagos = 'Consolidado' | 'Detallado' | 'Ambos';
+
+export interface ReportePagosFiltro {
+  fechaInicio: string;
+  fechaFin: string;
+  formaPagoId: number | null;
+}
+
+export interface PagoReporteView extends PedidoPagoView {
+  mesa_nombre: string;
+  pedido_status: StatusPedido;
+}
+
+export interface GrupoReportePagos {
+  formaPagoId: number;
+  nombre: string;
+  divisa: Divisa;
+  pagos: PagoReporteView[];
+  monto: number;
+  montoUsd: number;
+}
+
+export interface ReportePagos {
+  filtro: ReportePagosFiltro;
+  formaPagoNombre: string;
+  consultadoEn: string;
+  grupos: GrupoReportePagos[];
+  totalesPorDivisa: Record<Divisa, number>;
+  equivalenteUsd: number;
+  cantidadPagos: number;
+  pagosPedidosAnulados: number;
+}
+
 export type PedidoTab = 'Productos' | 'General' | 'Pagos';
 
-export type StatusPedidoFiltro = StatusPedido | 'Todos';
+export type StatusPedidoFiltro = StatusPedido | 'Todos' | 'Sin anulados';
 
 // Filtros con los que se puede abrir la pantalla Reporte (p. ej. desde los indicadores de Home).
 export interface ReporteFiltro {
@@ -140,4 +196,57 @@ export interface PedidoDetalleView extends PedidoDetalle {
   producto_nombre: string;
   producto_tipo: ProductoTipo;
   origen_mesa_nombre: string | null;
+}
+
+export type PresentacionReporte = 'Consolidado' | 'Detallado';
+
+export interface RangoReporte {
+  fechaInicio: string;
+  fechaFin: string;
+}
+
+export interface PedidoReporte {
+  pedido: Pedido;
+  detalle: PedidoDetalleView[];
+  descuentos: PedidoDescuentoView[];
+  pagos: PedidoPagoView[];
+  totales: TotalesPedido;
+}
+
+export interface ReportePedidos {
+  filtro: ReporteFiltro;
+  consultadoEn: string;
+  pedidos: PedidoReporte[];
+  totalUsd: number;
+}
+
+export interface VentaProductoLinea extends PedidoDetalleView {
+  mesa_nombre: string;
+  fecha_pedido: string;
+}
+
+export interface ProductoVendido {
+  productoId: number;
+  nombre: string;
+  cantidad: number;
+  montoUsd: number;
+  lineas: VentaProductoLinea[];
+}
+
+export interface VentasPorTipo {
+  tipo: ProductoTipo;
+  productos: ProductoVendido[];
+  cantidad: number;
+  montoUsd: number;
+}
+
+export interface ReporteVentas {
+  filtro: RangoReporte;
+  consultadoEn: string;
+  grupos: VentasPorTipo[];
+  cantidadPedidos: number;
+  cantidad: number;
+  brutoUsd: number;
+  descuentosUsd: number;
+  netoUsd: number;
 }

@@ -12,14 +12,19 @@ Funciona **100 % local**: no requiere servidor ni conexión a internet. Todos lo
 - Pagos en **USD, COP y BS** con tasas de cambio configurables, más propina sugerida.
 - Totales congelados al finalizar el pedido (snapshot de tasas y propina).
 - Operaciones sensibles protegidas con una clave especial (anular, reactivar).
-- Reporte de pedidos por rango de fechas y estado.
+- Menú **Reportes** con pedidos por fecha/estado y pagos por fecha/forma de pago.
+- Consulta e impresión de pagos en modo **Consolidado**, **Detallado** o **Ambos**, con totales por divisa.
 - Exportación de la base de datos para respaldo.
 - Impresión de tickets por Bluetooth clásico ESC/POS en Android, con formatos de 32 y 48 columnas.
 
 ## Módulos
 
 ### Home
-- Indicadores del día: pedidos del día, pedidos activos y unidades de platos principales vendidas.
+- **Pedidos del día:** pedidos creados hoy (fecha local) activos o finalizados, sin anulados.
+  Al tocarlo abre el reporte de hoy con el filtro **Sin anulados**.
+- **Pedidos activos:** todos los pedidos activos, incluso de días anteriores.
+- **Productos principal:** suma de unidades de tipo `Principal` en líneas activas de pedidos
+  creados hoy que estén activos o finalizados; excluye pedidos anulados y líneas anuladas/movidas.
 - Lista de pedidos activos.
 - Botón **+** para crear un pedido: se elige una mesa o se escribe un nombre libre. No se permiten dos pedidos activos con el mismo nombre.
 
@@ -69,7 +74,8 @@ Configuración de formas de pago (efectivo, pago móvil, transferencia, etc.) co
 6. Escribir el encabezado (hasta 240 caracteres, admite varias líneas), comprobar
    la conexión, imprimir una prueba y pulsar **Guardar configuración**. La prueba
    usa los valores del formulario aunque todavía no se hayan guardado.
-7. Usar **Imprimir** en la pestaña General del pedido o en el detalle del Reporte.
+7. Usar **Imprimir** en la pestaña General del pedido, en **Reportes → Reporte de pedidos**
+   o en **Reportes → Reporte de pagos** después de consultar.
    La conexión se reutiliza mientras esté disponible; si se perdió, se intenta
    conectar de nuevo al imprimir.
 
@@ -92,10 +98,63 @@ Enviar los datos por Bluetooth **no confirma** que haya papel ni que la impresi�
 física haya terminado. La conexión SPP y el resultado en la DIG-P501A deben probarse
 con la impresora real. La impresión no está habilitada para iOS ni web.
 
-### Reporte
+### Reportes
+La entrada **Reportes** del menú lateral permite elegir entre pedidos, pagos y análisis de ventas.
+
+#### Reporte de pedidos
 - Filtro por rango de fechas y estado del pedido.
+- **Sin anulados** incluye activos y finalizados; **Todos** conserva la consulta de todos los estados.
 - Detalle de cada pedido: líneas, totales y pagos.
 - Acceso a los pagos del pedido y opción de **Reactivar** un pedido finalizado o anulado (requiere clave).
+- Los indicadores de Home siguen abriendo este reporte directamente con sus filtros.
+- Seleccionar **Consolidado** o **Detallado**, consultar y pulsar **Imprimir reporte**.
+  El consolidado identifica cada pedido con mesa, fecha, estado e importe USD, y un total general.
+  El detallado añade productos (una fila por línea), descuentos, totales por divisa y pagos vigentes.
+- El total general suma los pedidos seleccionados. Si incluye pedidos anulados, se advierte
+  expresamente: ese total no representa ventas netas.
+- Cambiar fechas o estado invalida los resultados hasta consultar nuevamente.
+  La impresión usa los datos consultados y conserva los totales históricos de pedidos finalizados.
+
+#### Reporte de pagos
+1. Elegir fechas inicial/final (`YYYY-MM-DD`) y **Todas** o una forma de pago.
+   El rango usa la **fecha local del pago**, no la fecha de creación del pedido.
+2. Seleccionar **Consolidado**, **Detallado** o **Ambos** y pulsar **Consultar**.
+3. Pulsar **Imprimir consolidado / detallado / ambos** para enviar los mismos resultados
+   a la impresora Bluetooth configurada (Android, 32/48 columnas).
+
+- Consolidado: cantidad de pagos e importe por forma de pago y divisa.
+- Detallado: fecha/hora, número de pago y pedido, mesa, estado del pedido, importe,
+  tasa guardada y equivalente USD; subtotales por grupo.
+- Solo suman pagos vigentes. Las formas de pago inactivas siguen disponibles para
+  consultar sus cobros históricos.
+- Los pagos vigentes de pedidos anulados **se incluyen y se señalan con una advertencia**.
+- Los totales USD, COP y BS se muestran separados. El equivalente total USD suma
+  el `monto_usd` guardado de cada pago; no usa tasas actuales.
+- Se agrupa por la divisa guardada en el pago, aunque la forma de pago cambie de divisa después.
+- Cambiar fechas o forma de pago exige una nueva consulta antes de imprimir.
+  Cambiar la presentación reutiliza la misma consulta. El ticket identifica el rango,
+  la forma de pago y el momento de consulta.
+
+Es un reporte de cobros: no sustituye un cierre de caja con aperturas, retiros o diferencias.
+
+#### Análisis de ventas
+- Solo incluye **pedidos finalizados**, filtrados por la fecha local de **creación del pedido**
+  (no por fecha de pago ni por fecha de finalización).
+- **Consolidado**, seleccionado por defecto: productos agrupados por tipo
+  (Principal, Bebidas, Postres, Entrada), con cantidad total e importe original en USD por producto.
+- **Detallado**: una fila por línea de pedido, con fecha del pedido, mesa, cantidad,
+  precio unitario e importe. Por ejemplo, 5 unidades en un pedido y 2 en otro son **dos filas**;
+  en el consolidado son 7 unidades. Si cambiaron los precios, se conserva el precio de cada línea.
+- No incluye líneas anuladas ni movidas del origen; las líneas recibidas se contabilizan
+  en el pedido destino si este está finalizado y dentro del período.
+- Al final de pantalla y ticket: cantidades e importes por tipo, total de unidades,
+  **venta bruta**, **descuentos** y **total neto** en USD.
+- Los descuentos vigentes de los pedidos se restan **una sola vez** en el resumen general,
+  sin repartirlos entre productos/tipos. No incluye propina.
+- Pulsar **Consultar** y luego **Imprimir consolidado/detallado**. Usa la impresora configurada
+  de 32/48 columnas y el mismo resultado consultado. Al cambiar el período hay que volver a consultar.
+- Los nombres y tipos son los actuales del catálogo; cantidades, precios e importes son los
+  guardados en las líneas de pedido. No requiere cambios de esquema.
 
 ### Exportar DB
 Acción del menú lateral que comparte una copia de la base de datos `ordena.db`.

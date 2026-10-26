@@ -11,10 +11,9 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { MesasScreen } from '../screens/MesasScreen';
 import { ProductosScreen } from '../screens/ProductosScreen';
 import { ParametrosScreen } from '../screens/ParametrosScreen';
-import { ReporteScreen } from '../screens/ReporteScreen';
+import { ReportesScreen } from '../screens/ReportesScreen';
 import { FormasPagoScreen } from '../screens/FormasPagoScreen';
 import { exportDatabase } from '../services/exportService';
-import type { ReporteFiltro } from '../db/types';
 import { colors, spacing } from '../styles/theme';
 
 export type DrawerParamList = {
@@ -22,7 +21,7 @@ export type DrawerParamList = {
   Mesas: undefined;
   Productos: undefined;
   Parametros: undefined;
-  Reporte: ReporteFiltro | undefined;
+  Reportes: undefined;
   FormasPago: undefined;
 };
 
@@ -76,7 +75,7 @@ export const DrawerNavigator = () => (
     <Drawer.Screen name="Mesas" component={MesasScreen} />
     <Drawer.Screen name="Productos" component={ProductosScreen} />
     <Drawer.Screen name="Parametros" component={ParametrosScreen} />
-    <Drawer.Screen name="Reporte" component={ReporteScreen} />
+    <Drawer.Screen name="Reportes" component={ReportesScreen} />
     <Drawer.Screen name="FormasPago" component={FormasPagoScreen} options={{ title: 'Formas de pago' }} />
   </Drawer.Navigator>
 );

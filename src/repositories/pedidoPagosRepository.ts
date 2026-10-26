@@ -1,5 +1,23 @@
 import { executeSql, nowIso } from '../db/connection';
-import type { Divisa, PedidoPagoView, StatusPago } from '../db/types';
+import type { Divisa, PagoReporteView, PedidoPagoView, ReportePagosFiltro, StatusPago } from '../db/types';
+
+export const listPagosReporte = async (filtro: ReportePagosFiltro): Promise<PagoReporteView[]> => {
+  const params: (string | number)[] = [filtro.fechaInicio, filtro.fechaFin];
+  if (filtro.formaPagoId !== null) params.push(filtro.formaPagoId);
+  const result = await executeSql<PagoReporteView>(
+    `SELECT pp.*, fp.nombre as forma_pago_nombre,
+            p.mesa_nombre, p.status as pedido_status
+     FROM pedido_pagos pp
+     JOIN formas_pago fp ON fp.id = pp.forma_pago_id
+     JOIN pedidos p ON p.id = pp.pedido_id
+     WHERE pp.status = 'Activo'
+       AND date(pp.created_at, 'localtime') BETWEEN date(?) AND date(?)
+       ${filtro.formaPagoId !== null ? 'AND pp.forma_pago_id = ?' : ''}
+     ORDER BY pp.created_at ASC, pp.id ASC;`,
+    params
+  );
+  return result.rows._array;
+};
 
 export const listPagosPedido = async (pedidoId: number): Promise<PedidoPagoView[]> => {
   const result = await executeSql(

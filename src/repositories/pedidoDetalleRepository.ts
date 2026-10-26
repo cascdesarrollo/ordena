@@ -101,6 +101,10 @@ export const findLineaDestino = async (data: {
     `SELECT * FROM pedido_detalle
      WHERE pedido_id = ? AND producto_id = ? AND precio = ? AND origen_pedido_id = ?
        AND status = 'Activa'
+       AND NOT EXISTS (
+         SELECT 1 FROM pedido_descuentos d
+         WHERE d.pedido_detalle_id = pedido_detalle.id AND d.status = 'Activo'
+       )
      ORDER BY linea ASC
      LIMIT 1;`,
     [data.pedidoId, data.productoId, data.precio, data.origenPedidoId]

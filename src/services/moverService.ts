@@ -8,6 +8,7 @@ import {
   updatePedidoDetalleStatus,
 } from '../repositories/pedidoDetalleRepository';
 import { createPedido, getPedido, hasActiveOrderWithMesaName } from '../repositories/pedidosRepository';
+import { validarCambioLineaConDescuentos } from './descuentosService';
 
 export type DestinoMovimiento = { pedidoId: number } | { nuevoNombre: string };
 
@@ -62,6 +63,11 @@ export const moverProductos = async (
       }
 
       const restante = linea.cantidad - item.cantidad;
+      await validarCambioLineaConDescuentos(
+        origenPedidoId,
+        linea.id,
+        restante * linea.precio
+      );
       if (restante > 0) {
         await updatePedidoDetalleCantidad(linea.id, restante, linea.precio);
       } else {

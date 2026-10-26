@@ -1,5 +1,5 @@
 import { executeSql, nowIso } from '../db/connection';
-import type { Pedido, StatusPedido, TotalesPedido } from '../db/types';
+import type { Pedido, StatusPedido, StatusPedidoFiltro, TotalesPedido } from '../db/types';
 
 export const createPedido = async (mesaNombre: string): Promise<number> => {
   const now = nowIso();
@@ -96,11 +96,17 @@ export const hasActiveOrderWithMesaName = async (
 export const listPedidosByFechaStatus = async (
   startDate: string,
   endDate: string,
-  status?: StatusPedido
+  status?: StatusPedidoFiltro
 ): Promise<Pedido[]> => {
   const params: (string | number)[] = [startDate, endDate];
-  const statusClause = status ? 'AND status = ?' : '';
-  if (status) params.push(status);
+  let statusClause = '';
+  if (status === 'Sin anulados') {
+    statusClause = 'AND status IN (?, ?)';
+    params.push('Activo', 'Finalizado');
+  } else if (status && status !== 'Todos') {
+    statusClause = 'AND status = ?';
+    params.push(status);
+  }
 
   const result = await executeSql(
     `SELECT * FROM pedidos
@@ -120,7 +126,8 @@ export const getPedidosIndicadores = async (): Promise<{
   const pedidosDiaResult = await executeSql(
     `SELECT COUNT(*) as count
      FROM pedidos
-     WHERE date(created_at, 'localtime') = date('now', 'localtime');`
+     WHERE date(created_at, 'localtime') = date('now', 'localtime')
+       AND status IN ('Activo', 'Finalizado');`
   );
 
   const pedidosActivosResult = await executeSql(
@@ -135,6 +142,7 @@ export const getPedidosIndicadores = async (): Promise<{
      JOIN pedidos p ON p.id = pd.pedido_id
      JOIN productos i ON i.id = pd.producto_id
      WHERE date(p.created_at, 'localtime') = date('now', 'localtime')
+       AND p.status IN ('Activo', 'Finalizado')
        AND pd.status = 'Activa'
        AND i.tipo = 'Principal';`
   );

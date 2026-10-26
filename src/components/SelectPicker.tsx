@@ -12,13 +12,15 @@ interface Props<T extends string> {
   options: readonly (T | SelectOption<T>)[];
   value: T;
   onChange: (value: T) => void;
+  disabled?: boolean;
 }
 
 // Colores explícitos: en Android el Picker nativo toma el color de texto del tema
 // del sistema (blanco en modo oscuro) y el valor seleccionado queda invisible.
-export const SelectPicker = <T extends string>({ options, value, onChange }: Props<T>) => (
-  <View style={styles.wrapper}>
+export const SelectPicker = <T extends string>({ options, value, onChange, disabled = false }: Props<T>) => (
+  <View style={[styles.wrapper, disabled && styles.disabled]}>
     <Picker
+      enabled={!disabled}
       selectedValue={value}
       onValueChange={(selected) => onChange(selected as T)}
       style={styles.picker}
@@ -42,6 +44,9 @@ export const SelectPicker = <T extends string>({ options, value, onChange }: Pro
 );
 
 const styles = StyleSheet.create({
+  disabled: {
+    opacity: 0.5,
+  },
   wrapper: {
     borderWidth: 1,
     borderColor: colors.border,

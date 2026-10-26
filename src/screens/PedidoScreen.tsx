@@ -13,6 +13,7 @@ import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navig
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FloatingActionButton } from '../components/FloatingActionButton';
 import { ModalContainer } from '../components/ModalContainer';
+import { DescuentosResumen } from '../components/DescuentosResumen';
 import { SelectPicker } from '../components/SelectPicker';
 import { PasswordPrompt } from '../components/PasswordPrompt';
 import { SegmentedTabs } from '../components/SegmentedTabs';
@@ -22,6 +23,7 @@ import { commonStyles } from '../styles/common';
 import { colors, spacing } from '../styles/theme';
 import type {
   FormaPago,
+  PedidoDescuentoView,
   Pedido,
   PedidoDetalleView,
   PedidoPagoView,
@@ -51,7 +53,13 @@ import {
   listPagosPedido,
   updatePedidoPagoStatus,
 } from '../repositories/pedidoPagosRepository';
+import { listDescuentosPedido } from '../repositories/pedidoDescuentosRepository';
 import { calcularTotales, finalizarPedidoConTotales, getTotalesPedido } from '../services/totalesService';
+import {
+  agregarDescuentoPedido,
+  anularDescuentoPedido,
+  validarCambioLineaConDescuentos,
+} from '../services/descuentosService';
 import { describirDiferencia, redondear, resumirPagos, tasaDivisa } from '../services/pagosService';
 import { moverProductos } from '../services/moverService';
 import { verifySpecialPassword } from '../services/passwordService';
@@ -85,6 +93,14 @@ export const PedidoScreen = () => {
   const [showPasswordPedido, setShowPasswordPedido] = useState(false);
 
   const [totales, setTotales] = useState<TotalesPedido | null>(null);
+  const [descuentos, setDescuentos] = useState<PedidoDescuentoView[]>([]);
+  const [showAddDescuento, setShowAddDescuento] = useState(false);
+  const [descripcionDescuento, setDescripcionDescuento] = useState('');
+  const [montoDescuento, setMontoDescuento] = useState('');
+  const [detalleDescuentoId, setDetalleDescuentoId] = useState('');
+  const [selectedDescuento, setSelectedDescuento] = useState<PedidoDescuentoView | null>(null);
+  const [accionDescuento, setAccionDescuento] = useState<'agregar' | 'anular'>('agregar');
+  const [showPasswordDescuento, setShowPasswordDescuento] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
   const impresionEnCurso = useRef(false);
 
@@ -104,12 +120,13 @@ export const PedidoScreen = () => {
   const [cantidadesMover, setCantidadesMover] = useState<Record<number, number>>({});
 
   const loadData = useCallback(async () => {
-    const [pedidoData, detalleData, itemsData, pagosData, formasData] = await Promise.all([
+    const [pedidoData, detalleData, itemsData, pagosData, formasData, descuentosData] = await Promise.all([
       getPedido(pedidoId),
       listPedidoDetalle(pedidoId),
       listProductosActivos(),
       listPagosPedido(pedidoId),
       listFormasPagoActivas(),
+      listDescuentosPedido(pedidoId),
     ]);
 
     setPedido(pedidoData);
@@ -118,7 +135,8 @@ export const PedidoScreen = () => {
     setProductos(itemsData);
     setPagos(pagosData);
     setFormasPago(formasData);
-    setTotales(pedidoData ? await getTotalesPedido(pedidoData, detalleData) : null);
+    setDescuentos(descuentosData);
+    setTotales(pedidoData ? await getTotalesPedido(pedidoData, detalleData, descuentosData) : null);
   }, [pedidoId]);
 
   useFocusEffect(
@@ -179,9 +197,18 @@ export const PedidoScreen = () => {
       Alert.alert('Cantidad inválida', 'La cantidad debe ser un número mayor a 0.');
       return;
     }
-    await updatePedidoDetalleCantidad(selectedDetalle.id, cantidadNum, selectedDetalle.precio);
-    setShowEditItem(false);
-    await loadData();
+    try {
+      await validarCambioLineaConDescuentos(
+        pedidoId,
+        selectedDetalle.id,
+        cantidadNum * selectedDetalle.precio
+      );
+      await updatePedidoDetalleCantidad(selectedDetalle.id, cantidadNum, selectedDetalle.precio);
+      setShowEditItem(false);
+      await loadData();
+    } catch (error) {
+      Alert.alert('No se pudo modificar la línea', error instanceof Error ? error.message : String(error));
+    }
   };
 
   const handleAnularLinea = async (password: string) => {
@@ -191,16 +218,23 @@ export const PedidoScreen = () => {
       return;
     }
     if (!selectedDetalle) return;
-    await updatePedidoDetalleStatus(selectedDetalle.id, 'Anulada');
-    setShowEditItem(false);
-    await loadData();
+    try {
+      await validarCambioLineaConDescuentos(pedidoId, selectedDetalle.id, 0);
+      await updatePedidoDetalleStatus(selectedDetalle.id, 'Anulada');
+      setShowEditItem(false);
+      await loadData();
+    } catch (error) {
+      Alert.alert('No se pudo anular la línea', error instanceof Error ? error.message : String(error));
+    }
   };
 
   // Actualiza el detalle en pantalla sin recargar; en pedidos activos recalcula los totales en vivo.
   const aplicarDetalle = (data: PedidoDetalleView[]) => {
     detalleRef.current = data;
     setDetalle(data);
-    setTotales((prev) => (prev && !prev.historico ? calcularTotales(data, prev) : prev));
+    setTotales((prev) =>
+      prev && !prev.historico ? calcularTotales(data, prev, descuentos) : prev
+    );
   };
 
   const cambiarCantidad = async (detalleId: number, delta: number) => {
@@ -222,6 +256,16 @@ export const PedidoScreen = () => {
       ]);
       return;
     }
+    try {
+      await validarCambioLineaConDescuentos(
+        pedidoId,
+        item.id,
+        nuevaCantidad * item.precio
+      );
+    } catch (error) {
+      Alert.alert('No se pudo modificar la línea', error instanceof Error ? error.message : String(error));
+      return;
+    }
     aplicarDetalle(
       detalleRef.current.map((d) =>
         d.id === detalleId ? { ...d, cantidad: nuevaCantidad, monto: nuevaCantidad * d.precio } : d
@@ -234,7 +278,13 @@ export const PedidoScreen = () => {
   const handleAddItem = async (producto: Producto) => {
     setShowAddItem(false);
     const existente = detalleRef.current.find(
-      (d) => d.producto_id === producto.id && d.status === 'Activa'
+      (d) =>
+        d.producto_id === producto.id &&
+        d.status === 'Activa' &&
+        !descuentos.some(
+          (descuento) =>
+            descuento.status === 'Activo' && descuento.pedido_detalle_id === d.id
+        )
     );
     if (existente) {
       await cambiarCantidad(existente.id, 1);
@@ -249,6 +299,78 @@ export const PedidoScreen = () => {
       precio: producto.precio,
     });
     await loadData();
+  };
+
+  const openAddDescuento = () => {
+    setDescripcionDescuento('');
+    setMontoDescuento('');
+    setDetalleDescuentoId('');
+    setAccionDescuento('agregar');
+    setShowAddDescuento(true);
+  };
+
+  const requestAddDescuento = () => {
+    const monto = parseDecimal(montoDescuento);
+    if (!descripcionDescuento.trim()) {
+      Alert.alert('Descuento', 'Indique una descripción.');
+      return;
+    }
+    if (monto === null || monto <= 0) {
+      Alert.alert('Monto inválido', 'El descuento debe ser un monto mayor a 0.');
+      return;
+    }
+    setAccionDescuento('agregar');
+    setShowAddDescuento(false);
+    setShowPasswordDescuento(true);
+  };
+
+  const requestAnularDescuento = (descuento: PedidoDescuentoView) => {
+    if (!descuentosEditable) {
+      Alert.alert('Descuento', 'Para modificar descuentos, el pedido debe estar activo y sin pagos vigentes.');
+      return;
+    }
+    Alert.alert(
+      'Anular descuento',
+      `¿Desea anular "${descuento.descripcion}" por ${descuento.monto_usd.toFixed(2)} USD?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Continuar',
+          style: 'destructive',
+          onPress: () => {
+            setSelectedDescuento(descuento);
+            setAccionDescuento('anular');
+            setShowPasswordDescuento(true);
+          },
+        },
+      ]
+    );
+  };
+
+  const handlePasswordDescuento = async (password: string) => {
+    setShowPasswordDescuento(false);
+    if (!(await verifySpecialPassword(password))) {
+      Alert.alert('Clave inválida', 'Password invalido.');
+      return;
+    }
+    try {
+      if (accionDescuento === 'agregar') {
+        const monto = parseDecimal(montoDescuento);
+        if (monto === null) throw new Error('El monto del descuento no es válido.');
+        await agregarDescuentoPedido({
+          pedidoId,
+          detalleId: detalleDescuentoId ? Number(detalleDescuentoId) : null,
+          descripcion: descripcionDescuento,
+          montoUsd: monto,
+        });
+      } else if (selectedDescuento) {
+        await anularDescuentoPedido(selectedDescuento);
+      }
+      setSelectedDescuento(null);
+      await loadData();
+    } catch (error) {
+      Alert.alert('No se pudo guardar el descuento', error instanceof Error ? error.message : String(error));
+    }
   };
 
   const openMover = async () => {
@@ -458,9 +580,15 @@ export const PedidoScreen = () => {
   const editable = pedido?.status === 'Activo';
   // Los pagos se pueden registrar también después de finalizar; solo un pedido anulado los bloquea.
   const pagosEditable = !!pedido && pedido.status !== 'Anulado';
+  const descuentosEditable = !!editable && !pagos.some((pago) => pago.status === 'Activo');
   const montoPagoNum = parseDecimal(montoPago);
   const tasaPago = formaPagoSeleccionada && totales ? tasaDivisa(formaPagoSeleccionada.divisa, totales) : 0;
   const activos = detalle.filter((d) => d.status === 'Activa');
+  const lineaTieneDescuento = (detalleId: number) =>
+    descuentos.some(
+      (descuento) =>
+        descuento.status === 'Activo' && descuento.pedido_detalle_id === detalleId
+    );
 
   const countByTipo = activos.reduce<Record<ProductoTipo, number>>((acc, item) => {
     const tipo = item.producto_tipo;
@@ -509,6 +637,15 @@ export const PedidoScreen = () => {
 
         {tab === 'Productos' ? (
           <View style={commonStyles.card}>
+            {descuentosEditable && activos.length > 0 ? (
+              <TouchableOpacity style={styles.descuentoButton} onPress={openAddDescuento}>
+                <Text style={styles.descuentoButtonText}>Agregar descuento</Text>
+              </TouchableOpacity>
+            ) : editable && pagos.some((pago) => pago.status === 'Activo') ? (
+              <Text style={[commonStyles.mutedText, styles.descuentoAviso]}>
+                Anule los pagos vigentes para modificar descuentos.
+              </Text>
+            ) : null}
             {editable && activos.length > 0 ? (
               <TouchableOpacity style={styles.moverButton} onPress={openMover}>
                 <Text style={styles.moverButtonText}>Separar / mover productos</Text>
@@ -518,8 +655,9 @@ export const PedidoScreen = () => {
               <View key={item.id} style={styles.row}>
                 {editable ? (
                   <TouchableOpacity
-                    style={styles.stepButton}
+                    style={[styles.stepButton, lineaTieneDescuento(item.id) && styles.stepDisabled]}
                     onPress={() => cambiarCantidad(item.id, -1)}
+                    disabled={lineaTieneDescuento(item.id)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <Text style={styles.stepText}>−</Text>
@@ -528,11 +666,14 @@ export const PedidoScreen = () => {
                 <TouchableOpacity
                   style={styles.rowCenter}
                   onPress={() => openEditDetalle(item)}
-                  disabled={!editable}
+                  disabled={!editable || lineaTieneDescuento(item.id)}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{item.producto_nombre}</Text>
                     <Text style={commonStyles.mutedText}>{item.cantidad} x ${item.precio.toFixed(2)}</Text>
+                    {lineaTieneDescuento(item.id) ? (
+                      <Text style={styles.origenText}>Anule el descuento para editar esta línea.</Text>
+                    ) : null}
                     {item.origen_mesa_nombre ? (
                       <Text style={styles.origenText}>Movido de {item.origen_mesa_nombre}</Text>
                     ) : null}
@@ -541,8 +682,9 @@ export const PedidoScreen = () => {
                 </TouchableOpacity>
                 {editable ? (
                   <TouchableOpacity
-                    style={styles.stepButton}
+                    style={[styles.stepButton, lineaTieneDescuento(item.id) && styles.stepDisabled]}
                     onPress={() => cambiarCantidad(item.id, 1)}
+                    disabled={lineaTieneDescuento(item.id)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <Text style={styles.stepText}>+</Text>
@@ -553,6 +695,10 @@ export const PedidoScreen = () => {
             {activos.length === 0 ? (
               <Text style={commonStyles.mutedText}>No hay productos en el pedido.</Text>
             ) : null}
+            <DescuentosResumen
+              descuentos={descuentos}
+              onAnular={descuentosEditable ? requestAnularDescuento : undefined}
+            />
           </View>
         ) : tab === 'Pagos' ? (
           <View style={commonStyles.card}>
@@ -569,6 +715,10 @@ export const PedidoScreen = () => {
           <View style={commonStyles.card}>
             <Text style={commonStyles.title}>Resumen</Text>
             {totales ? <TotalesResumen totales={totales} /> : null}
+            <DescuentosResumen
+              descuentos={descuentos}
+              onAnular={descuentosEditable ? requestAnularDescuento : undefined}
+            />
 
             <Text style={commonStyles.title}>Cantidad por tipo</Text>
             {tipoOrder.map((tipo) => (
@@ -605,6 +755,47 @@ export const PedidoScreen = () => {
       ) : null}
 
       {tab === 'Pagos' && pagosEditable ? <FloatingActionButton onPress={openAddPago} /> : null}
+
+      <ModalContainer
+        visible={showAddDescuento}
+        title="Agregar descuento"
+        onClose={() => setShowAddDescuento(false)}
+        footer={
+          <TouchableOpacity style={commonStyles.button} onPress={requestAddDescuento}>
+            <Text style={commonStyles.buttonText}>Continuar</Text>
+          </TouchableOpacity>
+        }
+      >
+        <Text style={commonStyles.label}>Descripción</Text>
+        <TextInput
+          style={commonStyles.input}
+          value={descripcionDescuento}
+          onChangeText={setDescripcionDescuento}
+          placeholder="Ej: Cortesía"
+          maxLength={120}
+        />
+        <Text style={commonStyles.label}>Asociar a un producto (opcional)</Text>
+        <SelectPicker
+          options={[
+            { label: 'Descuento general', value: '' },
+            ...activos.map((item) => ({
+              label: `Línea ${item.linea}: ${item.producto_nombre} (${item.cantidad} x $${item.precio.toFixed(2)})`,
+              value: String(item.id),
+            })),
+          ]}
+          value={detalleDescuentoId}
+          onChange={setDetalleDescuentoId}
+        />
+        <Text style={commonStyles.label}>Monto del descuento (USD)</Text>
+        <TextInput
+          style={commonStyles.input}
+          value={montoDescuento}
+          onChangeText={setMontoDescuento}
+          keyboardType="decimal-pad"
+          placeholder="0.00"
+        />
+        <Text style={commonStyles.mutedText}>El descuento se resta del total del pedido.</Text>
+      </ModalContainer>
 
       <ModalContainer
         visible={showMover}
@@ -644,24 +835,34 @@ export const PedidoScreen = () => {
         <ScrollView style={styles.moverList}>
           {activos.map((item) => {
             const cantidadMover = cantidadesMover[item.id] ?? 0;
+            const bloqueadaPorDescuento = lineaTieneDescuento(item.id);
             return (
               <View key={item.id} style={styles.moverRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowTitle}>{item.producto_nombre}</Text>
                   <Text style={commonStyles.mutedText}>En pedido: {item.cantidad}</Text>
+                  {bloqueadaPorDescuento ? (
+                    <Text style={styles.origenText}>Anule el descuento para mover esta línea.</Text>
+                  ) : null}
                 </View>
                 <TouchableOpacity
-                  style={[styles.stepButton, cantidadMover <= 0 && styles.stepDisabled]}
+                  style={[
+                    styles.stepButton,
+                    (cantidadMover <= 0 || bloqueadaPorDescuento) && styles.stepDisabled,
+                  ]}
                   onPress={() => ajustarMover(item, -1)}
-                  disabled={cantidadMover <= 0}
+                  disabled={cantidadMover <= 0 || bloqueadaPorDescuento}
                 >
                   <Text style={styles.stepText}>−</Text>
                 </TouchableOpacity>
                 <Text style={styles.moverCantidad}>{cantidadMover}</Text>
                 <TouchableOpacity
-                  style={[styles.stepButton, cantidadMover >= item.cantidad && styles.stepDisabled]}
+                  style={[
+                    styles.stepButton,
+                    (cantidadMover >= item.cantidad || bloqueadaPorDescuento) && styles.stepDisabled,
+                  ]}
                   onPress={() => ajustarMover(item, 1)}
-                  disabled={cantidadMover >= item.cantidad}
+                  disabled={cantidadMover >= item.cantidad || bloqueadaPorDescuento}
                 >
                   <Text style={styles.stepText}>+</Text>
                 </TouchableOpacity>
@@ -791,6 +992,13 @@ export const PedidoScreen = () => {
         onCancel={() => setShowPasswordPago(false)}
         onConfirm={handleAnularPago}
       />
+
+      <PasswordPrompt
+        visible={showPasswordDescuento}
+        title={accionDescuento === 'agregar' ? 'Autorizar descuento' : 'Autorizar anulación'}
+        onCancel={() => setShowPasswordDescuento(false)}
+        onConfirm={handlePasswordDescuento}
+      />
     </View>
   );
 };
@@ -843,6 +1051,21 @@ const styles = StyleSheet.create({
   moverButtonText: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  descuentoButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: spacing.xs,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  descuentoButtonText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  descuentoAviso: {
+    marginBottom: spacing.sm,
   },
   moverList: {
     maxHeight: 360,

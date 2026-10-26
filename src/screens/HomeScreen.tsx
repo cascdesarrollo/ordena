@@ -2,7 +2,6 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import { FloatingActionButton } from '../components/FloatingActionButton';
 import { ModalContainer } from '../components/ModalContainer';
 import { SelectPicker } from '../components/SelectPicker';
@@ -12,13 +11,11 @@ import { listMesasActivas } from '../repositories/mesasRepository';
 import { createPedido, getPedidosIndicadores, hasActiveOrderWithMesaName, listPedidosActivos } from '../repositories/pedidosRepository';
 import type { Mesa, Pedido } from '../db/types';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import type { DrawerParamList } from '../navigation/DrawerNavigator';
 import { localDateString } from '../utils/format';
 import { TextInput } from 'react-native';
 
 export const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const drawerNavigation = useNavigation<DrawerNavigationProp<DrawerParamList>>();
   const [indicadores, setIndicadores] = useState({
     pedidosDia: 0,
     pedidosActivos: 0,
@@ -76,7 +73,7 @@ export const HomeScreen = () => {
 
   const openReporteDia = () => {
     const today = localDateString();
-    drawerNavigation.navigate('Reporte', { fechaInicio: today, fechaFin: today, status: 'Todos' });
+    navigation.navigate('Reporte', { fechaInicio: today, fechaFin: today, status: 'Sin anulados' });
   };
 
   // Los activos pueden venir de días anteriores: el rango arranca en el más antiguo.
@@ -87,7 +84,7 @@ export const HomeScreen = () => {
       null
     );
     const fechaInicio = masAntiguo ? localDateString(new Date(masAntiguo)) : today;
-    drawerNavigation.navigate('Reporte', { fechaInicio, fechaFin: today, status: 'Activo' });
+    navigation.navigate('Reporte', { fechaInicio, fechaFin: today, status: 'Activo' });
   };
 
   return (

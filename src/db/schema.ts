@@ -80,10 +80,22 @@ export const schemaStatements = [
     updated_at TEXT NOT NULL,
     pending_sync INTEGER NOT NULL DEFAULT 1
   );`,
+  `CREATE TABLE IF NOT EXISTS pedido_descuentos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pedido_id INTEGER NOT NULL,
+    pedido_detalle_id INTEGER,
+    descripcion TEXT NOT NULL,
+    monto_usd REAL NOT NULL CHECK (monto_usd > 0),
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    pending_sync INTEGER NOT NULL DEFAULT 1
+  );`,
   `CREATE INDEX IF NOT EXISTS idx_pedidos_status ON pedidos(status);`,
   `CREATE INDEX IF NOT EXISTS idx_pedidos_created_at ON pedidos(created_at);`,
   `CREATE INDEX IF NOT EXISTS idx_pedido_detalle_pedido ON pedido_detalle(pedido_id);`,
   `CREATE INDEX IF NOT EXISTS idx_pedido_pagos_pedido ON pedido_pagos(pedido_id);`,
+  `CREATE INDEX IF NOT EXISTS idx_pedido_descuentos_pedido ON pedido_descuentos(pedido_id);`,
 ];
 
 // Se insertan solo si la tabla formas_pago está vacía (también en BDs existentes: la tabla es nueva).
